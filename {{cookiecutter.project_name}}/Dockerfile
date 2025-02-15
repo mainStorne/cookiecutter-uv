@@ -1,21 +1,30 @@
-# Install uv
-FROM python:3.12-slim
-COPY --from=ghcr.io/astral-sh/uv:latest /uv /bin/uv
+FROM python:3.12 AS base
 
-# Change the working directory to the `app` directory
+ENV PYTHONDONTWRITEBYTECODE 1  # Отключаем создание .pyc файлов
+ENV PYTHONUNBUFFERED 1  # Убеждаемся, что вывод логов сразу идет в консоль (без буферизации)
+
+ENV VENV_PATH="/opt/venv"
+ENV PATH="$VENV_PATH/bin:$PATH"
+
 WORKDIR /app
 
-# Copy the lockfile and `pyproject.toml` into the image
-ADD uv.lock /app/uv.lock
-ADD pyproject.toml /app/pyproject.toml
+FROM ghcr.io/astral-sh/uv:0.5.21 AS uv
 
-# Install dependencies
-RUN uv sync --frozen --no-install-project
+FROM base AS builder
+ENV UV_COMPILE_BYTECODE=1
 
-# Copy the project into the image
-ADD . /app
+ENV UV_NO_INSTALLER_METADATA=1
+ENV UV_PROJECT_ENVIRONMENT=$VENV_PATH
+ENV UV_LINK_MODE=copy
 
-# Sync the project
-RUN uv sync --frozen
+RUN --mount=from=uv,source=/uv,target=/bin/uv \
+    --mount=type=cache,target=/root/.cache/uv \
+    --mount=type=bind,source=uv.lock,target=uv.lock \
+    --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
+    uv sync --no-install-project --no-editable
 
-CMD [ "python", "{{cookiecutter.project_slug}}/foo.py"]
+FROM base AS runner
+COPY --from=builder ${VENV_PATH} ${VENV_PATH}
+ENV PORT=8080
+COPY {{cookiecutter.project_slug}} .
+CMD uvicorn main:app --port ${PORT} --host 0.0.0.0

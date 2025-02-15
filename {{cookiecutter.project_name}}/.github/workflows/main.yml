@@ -1,71 +1,70 @@
-name: Main
+name: Deploy
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
+on: [push, workflow_dispatch]
+
+concurrency:
+    group: {% raw %}${{ github.workflow }}-${{ github.ref }}{% endraw %}
+    cancel-in-progress: true
+
+env:
+    STUFF_BUCKET: auth-sevice-internal-use-bucket
+    FOLDER_ID: b1g4o9t4vgcbnkpunqeu
+    SERVICE_ACCOUNT_ID: ajetqfs3ng6e1gjv7mdr
+    SECRET_VERSION_ID: e6qe0ts1dc9g0h1h4kob
+    SECRET_ID: e6q78o6erk6o9suemkh4
 
 jobs:
-  quality:
+  # JOB to build and test {{cookiecutter.project_name}} code
+  {{cookiecutter.project_name}}:
+    needs: changes
+    if: {% raw %}${{ needs.changes.outputs.{% endraw %}{{cookiecutter.project_name}}{% raw %} == 'true' }}{% endraw %}
     runs-on: ubuntu-latest
     steps:
-      - name: Check out
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - uses: actions/cache@v4
+      - uses: actions/setup-python@v4
         with:
-          path: ~/.cache/pre-commit
-          key: {% raw %}pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}{% endraw %}
+            python-version: "3.12"
 
-      - name: Set up the environment
-        uses: ./.github/actions/setup-python-env
+      - uses: yezz123/setup-uv@v4
 
-      - name: Run checks
-        run: make check
+      - name: Create Zip Archieve
+        working-directory: services/{{cookiecutter.project_name}}/{{cookiecutter.project_slug}}
+        run: |
+            uv sync
+            uv pip freeze > requirements.txt
 
-  tests-and-type-check:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        python-version: ["3.9", "3.10", "3.11", "3.12", "3.13"]
-      fail-fast: false
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - name: Check out
-        uses: actions/checkout@v4
-
-      - name: Set up the environment
-        uses: ./.github/actions/setup-python-env
+      - name: Deploy Function
+        id: sls-func
+        uses: yc-actions/yc-sls-function@v2.12.0
         with:
-          python-version: {% raw %}${{ matrix.python-version }}{% endraw %}
+            yc-sa-json-credentials: {% raw %}${{secrets.YC_SA_JSON_CREDENTIALS}}{% endraw %}
+            folder-id: {% raw %}${{env.FOLDER_ID}}{% endraw %}
+            service-account: {% raw %}${{env.SERVICE_ACCOUNT_ID}}{% endraw %}
+            source-root: services/{{cookiecutter.project_name}}/{{cookiecutter.project_slug}}
+            function-name: '{{cookiecutter.project_name}}'
+            runtime: 'python312'
+            memory: '256Mb'
+            entrypoint: 'main.handler'
+            bucket: {% raw %}${{env.STUFF_BUCKET}}{% endraw %}
+            secrets: |
+                {% raw %}OAUTH_KEY=${{env.SECRET_ID}}/${{env.SECRET_VERSION_ID}}/OAUTH_KEY{% endraw %}
+                {% raw %}DOCUMENT_API_ENDPOINT=${{env.SECRET_ID}}/${{env.SECRET_VERSION_ID}}/DOCUMENT_API_ENDPOINT{% endraw %}
+                {% raw %}DOCUMENT_DATABASE_PATH=${{env.SECRET_ID}}/${{env.SECRET_VERSION_ID}}/DOCUMENT_DATABASE_PATH{% endraw %}
+                {% raw %}AWS_ACCESS_KEY_ID=${{env.SECRET_ID}}/${{env.SECRET_VERSION_ID}}/AWS_ACCESS_KEY_ID{% endraw %}
+                {% raw %}AWS_SECRET_ACCESS_KEY=${{env.SECRET_ID}}/${{env.SECRET_VERSION_ID}}/AWS_SECRET_ACCESS_KEY{% endraw %}
+                {% raw %}JWT_PRIVATE_KEY=${{env.SECRET_ID}}/${{env.SECRET_VERSION_ID}}/JWT_PRIVATE_KEY{% endraw %}
 
-      - name: Run tests
-        run: uv run python -m pytest tests {% if cookiecutter.codecov == "y" %}--cov --cov-config=pyproject.toml --cov-report=xml{%- endif %}
+            include: |
+                **/*.py
+                requirements.txt
+            exclude: |
+                .venv 
+                uv.lock
+                README.md
+                pyproject.toml
+                .*
 
-      - name: Check typing
-        run: uv run mypy
+            execution-timeout: 1
 
-{% if cookiecutter.codecov == "y" %}
-      - name: Upload coverage reports to Codecov with GitHub Action on Python 3.11
-        uses: codecov/codecov-action@v4
-        if: {% raw %}${{ matrix.python-version == '3.11' }}{% endraw %}
-{%- endif %}
 
-{%- if cookiecutter.mkdocs == "y" %}
-
-  check-docs:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Check out
-        uses: actions/checkout@v4
-
-      - name: Set up the environment
-        uses: ./.github/actions/setup-python-env
-
-      - name: Check if documentation can be built
-        run: uv run mkdocs build -s
-{%- endif %}
