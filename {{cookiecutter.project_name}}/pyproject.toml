@@ -19,36 +19,14 @@ classifiers = [
 ]
 
 dependencies = [
-    "fastapi>=0.115.8",
-    {% if cookiecutter.serverless == 'Functions' %}"mangum>=0.19.0",{% endif %}
-    "pydantic-settings>=2.7.1",
-    "python-dotenv>=1.0.1",
-    "sqlmodel>=0.0.22",
-    "ydb-async>=0.0.2",
-    "ydb[yc]>=3.18.15",
+
 ]
 
 
 [dependency-groups]
 dev = [
-    {% if cookiecutter.serverless == 'Functions' %}"uvicorn>=0.34.0",{% endif %}
     "pytest>=7.2.0",
-    "pre-commit>=2.20.0",
-    "mypy>=0.991",
-    "ruff>=0.9.2",
 ]
-
-[tool.mypy]
-files = [
-    "{{cookiecutter.project_slug}}"
-]
-disallow_untyped_defs = true
-disallow_any_unimported = true
-no_implicit_optional = true
-check_untyped_defs = true
-warn_return_any = true
-warn_unused_ignores = true
-show_error_codes = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
