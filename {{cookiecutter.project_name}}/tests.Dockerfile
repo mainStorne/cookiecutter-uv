@@ -27,6 +27,6 @@ FROM base AS runner
 COPY --from=builder ${VENV_PATH} ${VENV_PATH}
 ENV PORT=8080
 COPY {{cookiecutter.project_slug}} .
+COPY tests tests
 
-ENTRYPOINT [ "/{{cookiecutter.project_slug}}/alembic.sh" ]
-CMD uvicorn {{cookiecutter.project_slug}}:app --port ${PORT} --host 0.0.0.0
+ENTRYPOINT ["/bin/sh", "-c", "pytest"]

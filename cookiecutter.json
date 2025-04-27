@@ -5,9 +5,5 @@
     "project_name": "example-project",
     "project_slug": "{{cookiecutter.project_name|lower|replace('-', '_')}}",
     "project_description": "Service:",
-    "root_path": "",
-    "serverless": [
-        "Functions",
-        "Containers"
-    ]
+    "root_path": ""
 }
