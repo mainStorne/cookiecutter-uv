@@ -1,9 +1,12 @@
 {
-    "author": "Dmitry",
-    "email": "dbevzpr@mail.ru",
-    "author_github_handle": "mainStorne",
-    "project_name": "example-project",
-    "project_slug": "{{cookiecutter.project_name|lower|replace('-', '_')}}",
-    "project_description": "Service:",
-    "root_path": ""
+    "templates": {
+        "fastapi": {
+            "path": "./templates/fastapi",
+            "title": "Fastapi project"
+        },
+        "flet": {
+            "path": "./templates/flet",
+            "title": "Flet project"
+        }
+    }
 }
